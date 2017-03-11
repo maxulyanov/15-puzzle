@@ -17,35 +17,52 @@ const EMPTY = 'EMPTY';
 
 class Puzzle {
 
+
+    /**
+     * 
+     * @param root
+     * @param series
+     */
     constructor(root, series) {
         this.root = root;
         this.series = series || Puzzle.generateSeries();
-        this.coordsEmptyCell = [ROW - 1, COLUMN - 1];
-        this.po = [0, 0];
-        this.dragSrcEl = null;
-        this.matrix = this.createMatrix(this.series);
+        this.coordinatesEmptyElement = [ROW - 1, COLUMN - 1];
+        this.coordinatesDragElement = [0, 0];
+        this.dragElement = null;
+        this.matrix = this._createMatrix(this.series);
     }
 
 
+    /**
+     *
+     */
     render() {
         this.matrix.forEach((row) => {
-            const container = this.createRow();
+            const container = this._createRow();
             row.forEach((column) => {
                 container.appendChild(column);
             });
         });
-        this.attachEvents();
+        this._attachEvents();
     }
 
 
+    /**
+     *
+     */
     update() {
-        this.detachEvent();
+        this.detachEvents();
         this.root.innerHTML = null;
         this.render();
     }
 
 
-    createRow() {
+    /**
+     *
+     * @returns {Element}
+     * @private
+     */
+    _createRow() {
         const row = document.createElement('div');
         row.className = 'row';
         this.root.appendChild(row);
@@ -53,7 +70,13 @@ class Puzzle {
     }
 
 
-    createElement(content) {
+    /**
+     *
+     * @param content
+     * @returns {Element}
+     * @private
+     */
+    _createElement(content) {
         const element = document.createElement('div');
         element.innerHTML = content;
         element.className = 'column';
@@ -61,76 +84,97 @@ class Puzzle {
     }
 
 
-    attachEvents() {
-        const empty = this.matrix[this.coordsEmptyCell[0]][this.coordsEmptyCell[1]];
-
-        const self = this;
-
-        empty.addEventListener('dragover', handleDragOver.bind(self), false);
-        empty.setAttribute('draggable', 'true');
-        empty.addEventListener('drop', this.handleDrop.bind(self), false);
-
+    /**
+     *
+     * @private
+     */
+    _attachEvents() {
+        this._attachEventsEmptyElement();
 
         // top
-        if(this.coordsEmptyCell[0] !== 0) {
-            this.wrapperDrag(this.matrix[this.coordsEmptyCell[0] - 1][this.coordsEmptyCell[1]], [this.coordsEmptyCell[0] - 1 , this.coordsEmptyCell[1]]);
+        if(this.coordinatesEmptyElement[0] !== 0) {
+            this._attachEventsElement(this._getElementFromMatrix(this.coordinatesEmptyElement[0] - 1, this.coordinatesEmptyElement[1]));
         }
         // bottom
-        if(this.coordsEmptyCell[0] !== ROW - 1) {
-            this.wrapperDrag(this.matrix[this.coordsEmptyCell[0] + 1][this.coordsEmptyCell[1]], [this.coordsEmptyCell[0] + 1, this.coordsEmptyCell[1]]);
+        if(this.coordinatesEmptyElement[0] !== ROW - 1) {
+            this._attachEventsElement(this._getElementFromMatrix(this.coordinatesEmptyElement[0] + 1, this.coordinatesEmptyElement[1]));
         }
         // left
-        if(this.coordsEmptyCell[1] !== 0) {
-            this.wrapperDrag(this.matrix[this.coordsEmptyCell[0]][this.coordsEmptyCell[1] - 1], [this.coordsEmptyCell[0], this.coordsEmptyCell[1] - 1]);
+        if(this.coordinatesEmptyElement[1] !== 0) {
+            this._attachEventsElement(this._getElementFromMatrix(this.coordinatesEmptyElement[0], this.coordinatesEmptyElement[1] - 1));
         }
         // right
-        if(this.coordsEmptyCell[1] !== COLUMN - 1) {
-            this.wrapperDrag(this.matrix[this.coordsEmptyCell[0]][this.coordsEmptyCell[1] + 1], [this.coordsEmptyCell[0], this.coordsEmptyCell[1] + 1]);
+        if(this.coordinatesEmptyElement[1] !== COLUMN - 1) {
+            this._attachEventsElement(this._getElementFromMatrix(this.coordinatesEmptyElement[0], this.coordinatesEmptyElement[1] + 1));
         }
     }
 
 
-    detachEvent() {
+    /**
+     *
+     * @param element
+     * @param isEmpty
+     * @private
+     */
+    _attachEventsElement(element, isEmpty) {
+        if(!isEmpty) {
+            element.setAttribute('draggable', 'true');
+        }
+
+        const self = this;
+
+        element.addEventListener('dragover', this._handleDragOver.bind(self), false);
+        element.addEventListener('dragstart', this._handleDragStart.bind(self), false);
+        element.addEventListener('dragenter', this._handlerDragEnter.bind(self), false);
+        element.addEventListener('dragleave', this._handleDragLeave.bind(self), false);
+        element.addEventListener('dragend', this._handlerDragEnd.bind(self), false);
+    }
+
+
+    /**
+     *
+     * @private
+     */
+    _attachEventsEmptyElement() {
+        const element = this._getElementFromMatrix(this.coordinatesEmptyElement);
+        const self = this;
+
+        this._attachEventsElement(element, true);
+        element.classList.add('is-empty');
+        element.addEventListener('drop', this._handleDrop.bind(self), false);
+    }
+
+    /**
+     *
+     * @private
+     */
+    detachEvents() {
         this.matrix.forEach((row) => {
             row.forEach((column) => {
                 column.removeAttribute('draggable');
-                column.removeEventListener('dragover', handleDragOver);
-                column.removeEventListener('drop', this.handleDrop);
-                column.removeEventListener('dragstart', this.handleDragStart);
+                column.removeEventListener('dragstart', this._handleDragStart);
+                column.removeEventListener('dragenter', this._handlerDragEnter);
+                column.removeEventListener('dragover', this._handleDragOver);
+                column.removeEventListener('dragleave', this._handleDragLeave);
+                column.removeEventListener('dragend', this._handlerDragEnd);
+                column.removeEventListener('drop', this._handleDrop);
             });
         });
     }
 
-    wrapperDrag(element, pos) {
-        element.setAttribute('draggable', 'true');
-        element.addEventListener('dragstart', this.handleDragStart.bind(this, pos), false);
-        element.setAttribute('draggable', 'true');
-    }
 
-
-    handleDrop(event) {
-        event.stopPropagation();
-        // Don't do anything if dropping the same column we're dragging.
-        if (this.dragSrcEl != event.target) {
-            const el = this.matrix[this.pos[0]][this.pos[1]];
-
-
-            this.matrix[this.pos[0]][this.pos[1]] = this.matrix[this.coordsEmptyCell[0]][this.coordsEmptyCell[1]];
-            this.matrix[this.coordsEmptyCell[0]][this.coordsEmptyCell[1]] = el;
-
-            this.coordsEmptyCell = this.pos;
-
-            this.update();
-
+    /**
+     *
+     * @param row
+     * @param column
+     * @returns {*}
+     * @private
+     */
+    _getElementFromMatrix(row, column) {
+        if(Array.isArray(row)) {
+            return this.matrix[row[0]][row[1]];
         }
-
-        return false;
-    }
-
-
-    handleDragStart(pos, event) {
-        this.dragSrcEl = event.target;
-        this.pos = pos;
+        return this.matrix[row][column];
     }
 
 
@@ -139,21 +183,117 @@ class Puzzle {
      * @param series
      * @returns {Array}
      */
-    createMatrix(series) {
+    _createMatrix(series) {
         const matrix = [];
         let position = 0;
         for(let i = 0; i < ROW; i++) {
             matrix[i] = [];
             for(let j = 0; j < COLUMN; j++) {
                 const element = series[position];
-                matrix[i].push(this.createElement(element));
+                matrix[i].push(this._createElement(element));
                 if(element == EMPTY) {
-                    this.coordsEmptyCell = [i, j];
+                    this.coordinatesEmptyElement = [i, j];
                 }
                 position++;
             }
         }
         return matrix;
+    }
+
+
+    _checkForVictory() {
+        return false;
+    }
+
+
+
+    /**
+     *
+     * @param event
+     * @private
+     */
+    _handleDragStart(event) {
+        this.dragElement = event.target;
+        this.matrix.forEach((row, index) => {
+            const searchIndex = row.indexOf(this.dragElement);
+            if(searchIndex >= 0) {
+                this.coordinatesDragElement = [index, searchIndex];
+            }
+        });
+    }
+
+
+    /**
+     *
+     * @param event
+     * @returns {boolean}
+     * @private
+     */
+    _handleDragOver(event) {
+        event.preventDefault();
+        return false;
+    }
+
+
+    /**
+     *
+     * @param event
+     * @private
+     */
+    _handlerDragEnter(event) {
+        event.preventDefault();
+        event.target.classList.add('is-active');
+    }
+
+
+    /**
+     *
+     * @param event
+     * @private
+     */
+    _handleDragLeave(event) {
+        event.preventDefault();
+        event.target.classList.remove('is-active');
+    }
+
+
+    /**
+     *
+     * @param event
+     * @private
+     */
+    _handlerDragEnd(event) {
+        event.preventDefault();
+        event.target.classList.remove('is-active');
+    }
+
+
+    /**
+     *
+     * @param event
+     * @returns {boolean}
+     * @private
+     */
+    _handleDrop(event) {
+        event.stopPropagation();
+        if (this.dragElement != event.target) {
+            const dragElement = this._getElementFromMatrix(this.coordinatesDragElement);
+            const emptyElement = this._getElementFromMatrix(this.coordinatesEmptyElement);
+
+            this.matrix[this.coordinatesDragElement[0]][this.coordinatesDragElement[1]] = emptyElement;
+            this.matrix[this.coordinatesEmptyElement[0]][this.coordinatesEmptyElement[1]] = dragElement;
+            this.coordinatesEmptyElement = this.coordinatesDragElement;
+
+            if(this._checkForVictory()) {
+                console.log('win!');
+                this.detachEvents();
+            }
+            else {
+                this.update();
+            }
+        }
+
+        return false;
     }
 
 
@@ -187,14 +327,3 @@ class Puzzle {
     }
 
 }
-
-
-
-function handleDragOver(e) {
-    if (e.preventDefault) {
-        e.preventDefault();
-    }
-
-    return false;
-}
-
