@@ -13,6 +13,7 @@
 const ROW = 4;
 const COLUMN = 4;
 const EMPTY = 'EMPTY';
+const ANIMATE_DURATION = 300;
 
 
 class Puzzle {
@@ -25,7 +26,8 @@ class Puzzle {
      */
     constructor(root, series) {
         this.root = root;
-        this.series = series || Puzzle.generateSeries();
+        this.series = series || Puzzle.generateSeries(true);
+        this.winSeries = Puzzle.generateSeries(false);
         this.coordinatesEmptyElement = [ROW - 1, COLUMN - 1];
         this.coordinatesDragElement = [0, 0];
         this.dragElement = null;
@@ -39,8 +41,8 @@ class Puzzle {
     render() {
         this.matrix.forEach((row) => {
             const container = this._createRow();
-            row.forEach((column) => {
-                container.appendChild(column);
+            row.forEach((cell) => {
+                container.appendChild(cell);
             });
         });
         this._attachEvents();
@@ -51,7 +53,6 @@ class Puzzle {
      *
      */
     update() {
-        this.detachEvents();
         this.root.innerHTML = null;
         this.render();
     }
@@ -79,7 +80,7 @@ class Puzzle {
     _createElement(content) {
         const element = document.createElement('div');
         element.innerHTML = content;
-        element.className = 'column';
+        element.className = 'cell';
         return element;
     }
 
@@ -149,17 +150,15 @@ class Puzzle {
      * @private
      */
     detachEvents() {
-        this.matrix.forEach((row) => {
-            row.forEach((column) => {
-                column.removeAttribute('draggable');
-                column.removeEventListener('dragstart', this._handleDragStart);
-                column.removeEventListener('dragenter', this._handlerDragEnter);
-                column.removeEventListener('dragover', this._handleDragOver);
-                column.removeEventListener('dragleave', this._handleDragLeave);
-                column.removeEventListener('dragend', this._handlerDragEnd);
-                column.removeEventListener('drop', this._handleDrop);
-            });
-        });
+        for(let i = 0; i < this.matrix.length; i++) {
+            const cells = this.matrix[i];
+            for(let j = 0; j < cells.length; j++) {
+                const cell = cells[j];
+                cell.removeAttribute('draggable');
+                cell.classList.remove('is-active');
+                cells[j] = cell.cloneNode(true);
+            }
+        }
     }
 
 
@@ -201,8 +200,20 @@ class Puzzle {
     }
 
 
+    /**
+     *
+     * @returns {boolean}
+     * @private
+     */
     _checkForVictory() {
-        return false;
+        const series = [];
+        this.matrix.forEach((row) => {
+            row.forEach((cell) => {
+                series.push(cell.innerHTML)
+            });
+        });
+
+        return this.winSeries.join('') === series.join('');
     }
 
 
@@ -214,6 +225,10 @@ class Puzzle {
      */
     _handleDragStart(event) {
         this.dragElement = event.target;
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('html', this.dragElement.innerHTML);
+        event.dataTransfer.setData('classes', this.dragElement.getAttribute('class'));
+
         this.matrix.forEach((row, index) => {
             const searchIndex = row.indexOf(this.dragElement);
             if(searchIndex >= 0) {
@@ -264,7 +279,11 @@ class Puzzle {
      */
     _handlerDragEnd(event) {
         event.preventDefault();
-        event.target.classList.remove('is-active');
+        this.matrix.forEach((row) => {
+            row.forEach((cell) => {
+                cell.classList.remove('is-active');
+            });
+        });
     }
 
 
@@ -276,21 +295,27 @@ class Puzzle {
      */
     _handleDrop(event) {
         event.stopPropagation();
-        if (this.dragElement != event.target) {
-            const dragElement = this._getElementFromMatrix(this.coordinatesDragElement);
-            const emptyElement = this._getElementFromMatrix(this.coordinatesEmptyElement);
 
-            this.matrix[this.coordinatesDragElement[0]][this.coordinatesDragElement[1]] = emptyElement;
-            this.matrix[this.coordinatesEmptyElement[0]][this.coordinatesEmptyElement[1]] = dragElement;
+        const target = event.target;
+        if (this.dragElement != target) {
+            this.dragElement.innerHTML = target.innerHTML;
+            this.dragElement.classList.add('is-empty');
+            target.innerHTML = event.dataTransfer.getData('html');
+            target.className = event.dataTransfer.getData('classes');
+
             this.coordinatesEmptyElement = this.coordinatesDragElement;
 
-            if(this._checkForVictory()) {
-                console.log('win!');
+            setTimeout(() => {
                 this.detachEvents();
-            }
-            else {
-                this.update();
-            }
+
+                if(this._checkForVictory()) {
+                    this.root.classList.add('is-win');
+                }
+                else {
+                    this.update();
+                }
+            }, ANIMATE_DURATION)
+
         }
 
         return false;
@@ -299,14 +324,15 @@ class Puzzle {
 
     /**
      *
-     * @returns {*}
+     * @param shuffle
+     * @returns {Array}
      */
-    static generateSeries() {
+    static generateSeries(shuffle) {
         const cells = [];
         for(let i = 1; i <= ROW * COLUMN; i++) {
             ROW * COLUMN === i ? cells.push(EMPTY) : cells.push(i);
         }
-        return Puzzle.shuffle(cells);
+        return shuffle ? Puzzle.shuffle(cells) : cells;
     }
 
 
